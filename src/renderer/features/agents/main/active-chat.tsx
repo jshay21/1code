@@ -3575,13 +3575,8 @@ export function ChatView({
   const setUndoStack = useSetAtom(undoStackAtom)
   const { notifyAgentComplete } = useDesktopNotifications()
 
-  // Tool notifications (toast + activity feed) - listens for tool events via window events
-  // Uses activeSubChatId which is set when this component mounts/updates
+  // Get active sub-chat ID for tracking purposes
   const activeSubChatId = useAgentSubChatStore((state) => state.activeSubChatId)
-  useToolNotifications(
-    activeSubChatId || "",
-    agentChat?.name || "Agent",
-  )
 
   // Check if any chat has unseen changes
   const hasAnyUnseenChanges = unseenChanges.size > 0
@@ -3690,9 +3685,6 @@ export function ChatView({
     })
   }, [chatId, setUnseenChanges])
 
-  // Get sub-chat state from store
-  const activeSubChatId = useAgentSubChatStore((state) => state.activeSubChatId)
-
   // Clear sub-chat "unseen changes" indicator when sub-chat becomes active
   useEffect(() => {
     if (!activeSubChatId) return
@@ -3725,6 +3717,13 @@ export function ChatView({
     { chatId },
     { enabled: !!chatId },
   )
+
+  // Tool notifications (toast + activity feed) - listens for tool events via window events
+  useToolNotifications(
+    activeSubChatId || "",
+    agentChat?.name || "Agent",
+  )
+
   const agentSubChats = (agentChat?.subChats ?? []) as Array<{
     id: string
     name?: string | null
