@@ -13,6 +13,8 @@ import {
   Undo2,
   Upload,
   Download,
+  Sparkles,
+  Loader2,
 } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { Button } from "../../components/ui/button"
@@ -227,6 +229,14 @@ export function GitPanel({
     onError: (err) => toast.error(`Pull failed: ${err.message}`),
   })
 
+  const generateMutation = trpc.changes.generateCommitMessage.useMutation({
+    onSuccess: (data) => {
+      setCommitMessage(data.message)
+      toast.success("Generated commit message")
+    },
+    onError: (err) => toast.error(err.message),
+  })
+
   const handleStage = useCallback(
     async (filePath: string) => {
       if (!worktreePath) return
@@ -282,10 +292,10 @@ export function GitPanel({
 
   const unstagedFiles = useMemo(() => {
     if (!status) return []
-    return [...status.unstaged, ...status.untracked]
+    return [...(status.unstaged ?? []), ...(status.untracked ?? [])]
   }, [status])
 
-  const stagedCount = status?.staged.length || 0
+  const stagedCount = status?.staged?.length ?? 0
   const unstagedCount = unstagedFiles.length
   const hasChanges = stagedCount > 0 || unstagedCount > 0
 
@@ -371,18 +381,36 @@ export function GitPanel({
 
       {/* Commit input */}
       <div className="px-3 py-2 border-b">
-        <Textarea
-          placeholder="Commit message"
-          value={commitMessage}
-          onChange={(e) => setCommitMessage(e.target.value)}
-          className="min-h-[60px] text-sm resize-none"
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-              e.preventDefault()
-              handleCommit()
-            }
-          }}
-        />
+        <div className="relative">
+          <Textarea
+            placeholder="Commit message"
+            value={commitMessage}
+            onChange={(e) => setCommitMessage(e.target.value)}
+            className="min-h-[60px] text-sm resize-none pr-8"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault()
+                handleCommit()
+              }
+            }}
+          />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                className="absolute top-2 right-2 p-1 rounded hover:bg-muted disabled:opacity-50"
+                onClick={() => worktreePath && generateMutation.mutate({ worktreePath })}
+                disabled={generateMutation.isPending || stagedCount === 0}
+              >
+                {generateMutation.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5" />
+                )}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Generate with AI</TooltipContent>
+          </Tooltip>
+        </div>
         <div className="flex items-center gap-2 mt-2">
           <Button
             size="sm"
@@ -441,7 +469,7 @@ export function GitPanel({
               )}
             </CollapsibleTrigger>
             <CollapsibleContent>
-              {status?.staged.map((file) => (
+              {status?.staged?.map((file) => (
                 <FileItem
                   key={file.path}
                   file={file}
@@ -493,7 +521,7 @@ export function GitPanel({
               )}
             </CollapsibleTrigger>
             <CollapsibleContent>
-              {status?.unstaged.map((file) => (
+              {status?.unstaged?.map((file) => (
                 <FileItem
                   key={file.path}
                   file={file}
@@ -504,7 +532,7 @@ export function GitPanel({
                   isStaging={isStaging}
                 />
               ))}
-              {status?.untracked.map((file) => (
+              {status?.untracked?.map((file) => (
                 <FileItem
                   key={file.path}
                   file={file}

@@ -1,10 +1,12 @@
 import { shell } from "electron";
 import simpleGit from "simple-git";
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { publicProcedure, router } from "../trpc";
 import { isUpstreamMissingError } from "./git-utils";
 import { assertRegisteredWorktree } from "./security";
 import { fetchGitHubPRStatus } from "./github";
+import { generateCommitMessageWithSDK } from "./ai-commit-sdk";
 
 export { isUpstreamMissingError };
 
@@ -40,6 +42,40 @@ export const createGitOperationsRouter = () => {
 					return { success: true, hash: result.commit };
 				},
 			),
+
+		generateCommitMessage: publicProcedure
+			.input(z.object({ worktreePath: z.string() }))
+			.mutation(async ({ input }) => {
+				assertRegisteredWorktree(input.worktreePath);
+
+				const git = simpleGit(input.worktreePath);
+				const diffResult = await git.diff(["--cached"]);
+
+				if (!diffResult.trim()) {
+					throw new TRPCError({
+						code: "BAD_REQUEST",
+						message: "No staged changes",
+					});
+				}
+
+				// Get staged file list from status
+				const statusResult = await git.status();
+				const stagedFiles = statusResult.staged.map((path) => ({
+					path,
+					status: "modified" as const,
+					additions: 0,
+					deletions: 0,
+				}));
+
+				// Use SDK-based generation (handles OAuth token internally)
+				const message = await generateCommitMessageWithSDK({
+					stagedFiles,
+					diffContent: diffResult,
+					worktreePath: input.worktreePath,
+				});
+
+				return { message };
+			}),
 
 		push: publicProcedure
 			.input(

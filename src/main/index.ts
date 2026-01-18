@@ -2,7 +2,8 @@ import { app, BrowserWindow, session, Menu } from "electron"
 import { join } from "path"
 import { createServer } from "http"
 import { readFileSync, existsSync, unlinkSync, readlinkSync } from "fs"
-import * as Sentry from "@sentry/electron/main"
+// NOTE: @sentry/electron CANNOT be statically imported - it accesses electron.app at require time
+// which fails in dev mode. We use dynamic import in initSentry() instead.
 import { initDatabase, closeDatabase } from "./lib/db"
 import { createMainWindow, getWindow, showLoginPage } from "./windows/main"
 import { AuthManager } from "./auth-manager"
@@ -36,24 +37,29 @@ if (IS_DEV) {
   console.log("[Dev] Using separate userData path:", devUserData)
 }
 
-// Initialize Sentry before app is ready (production only)
-if (app.isPackaged && !IS_DEV) {
-  const sentryDsn = import.meta.env.MAIN_VITE_SENTRY_DSN
-  if (sentryDsn) {
-    try {
-      Sentry.init({
-        dsn: sentryDsn,
-      })
-      console.log("[App] Sentry initialized")
-    } catch (error) {
-      console.warn("[App] Failed to initialize Sentry:", error)
+// Initialize Sentry (production only) - uses dynamic import to avoid dev mode crashes
+// @sentry/electron accesses electron.app.getAppPath() at require time
+async function initSentry(): Promise<void> {
+  if (app.isPackaged && !IS_DEV) {
+    const sentryDsn = import.meta.env.MAIN_VITE_SENTRY_DSN
+    if (sentryDsn) {
+      try {
+        const Sentry = await import("@sentry/electron/main")
+        Sentry.init({ dsn: sentryDsn })
+        console.log("[App] Sentry initialized")
+      } catch (error) {
+        console.warn("[App] Failed to initialize Sentry:", error)
+      }
+    } else {
+      console.log("[App] Skipping Sentry initialization (no DSN configured)")
     }
   } else {
-    console.log("[App] Skipping Sentry initialization (no DSN configured)")
+    console.log("[App] Skipping Sentry initialization (dev mode)")
   }
-} else {
-  console.log("[App] Skipping Sentry initialization (dev mode)")
 }
+
+// Initialize Sentry asynchronously (non-blocking)
+initSentry().catch(console.error)
 
 // URL configuration (exported for use in other modules)
 // In packaged app, ALWAYS use production URL to prevent localhost leaking into releases

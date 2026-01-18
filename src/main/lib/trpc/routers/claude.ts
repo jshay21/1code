@@ -1,6 +1,6 @@
 import { observable } from "@trpc/server/observable"
 import { eq } from "drizzle-orm"
-import { app, safeStorage, BrowserWindow } from "electron"
+import { app, BrowserWindow } from "electron"
 import path from "path"
 import * as os from "os"
 import * as fs from "fs/promises"
@@ -13,9 +13,10 @@ import {
   logRawClaudeMessage,
   type UIMessageChunk,
 } from "../../claude"
-import { chats, claudeCodeCredentials, getDatabase, subChats } from "../../db"
+import { chats, getDatabase, subChats } from "../../db"
 import { publicProcedure, router } from "../index"
 import { buildAgentsOption } from "./agent-utils"
+import { getClaudeCodeToken } from "../../claude/token"
 
 /**
  * Parse @[agent:name], @[skill:name], and @[tool:name] mentions from prompt text
@@ -84,41 +85,6 @@ function parseMentions(prompt: string): {
   return { cleanedPrompt, agentMentions, skillMentions, fileMentions, folderMentions, toolMentions }
 }
 
-/**
- * Decrypt token using Electron's safeStorage
- */
-function decryptToken(encrypted: string): string {
-  if (!safeStorage.isEncryptionAvailable()) {
-    return Buffer.from(encrypted, "base64").toString("utf-8")
-  }
-  const buffer = Buffer.from(encrypted, "base64")
-  return safeStorage.decryptString(buffer)
-}
-
-/**
- * Get Claude Code OAuth token from local SQLite
- * Returns null if not connected
- */
-function getClaudeCodeToken(): string | null {
-  try {
-    const db = getDatabase()
-    const cred = db
-      .select()
-      .from(claudeCodeCredentials)
-      .where(eq(claudeCodeCredentials.id, "default"))
-      .get()
-
-    if (!cred?.oauthToken) {
-      console.log("[claude] No Claude Code credentials found")
-      return null
-    }
-
-    return decryptToken(cred.oauthToken)
-  } catch (error) {
-    console.error("[claude] Error getting Claude Code token:", error)
-    return null
-  }
-}
 
 // Dynamic import for ESM module
 const getClaudeQuery = async () => {
