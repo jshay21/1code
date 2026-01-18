@@ -370,11 +370,15 @@ export function createTransformer() {
       }
 
       // Compact boundary - mark the compacting tool as complete
+      // Includes pre_tokens which is the actual context size before compacting
       if (msg.subtype === "compact_boundary" && lastCompactId) {
+        const preTokens = msg.compact_metadata?.pre_tokens
+        console.log("[transform] COMPACT_BOUNDARY pre_tokens:", preTokens)
         yield {
           type: "system-Compact",
           toolCallId: lastCompactId,
           state: "output-available",
+          preTokens,
         }
         lastCompactId = null // Clear for next compacting cycle
       }
@@ -383,16 +387,43 @@ export function createTransformer() {
     // ===== RESULT (final) =====
     if (msg.type === "result") {
       console.log("[transform] RESULT message, textStarted:", textStarted, "lastTextId:", lastTextId)
+      console.log("[transform] RESULT usage:", {
+        usage: msg.usage,
+        modelUsage: msg.modelUsage,
+      })
       yield* endTextBlock()
       yield* endToolInput()
 
-      const inputTokens = msg.usage?.input_tokens
-      const outputTokens = msg.usage?.output_tokens
+      // Extract per-turn token usage from msg.usage (Anthropic API response)
+      // msg.usage has per-turn values; msg.modelUsage has cumulative session totals
+      const perTurnInputTokens = msg.usage?.input_tokens || 0
+      const perTurnOutputTokens = msg.usage?.output_tokens || 0
+      const cacheReadTokens = msg.usage?.cache_read_input_tokens || 0
+      const cacheCreationTokens = msg.usage?.cache_creation_input_tokens || 0
+
+      // Context size for this turn = new input tokens + tokens read from cache
+      // This represents what was actually in the context window for this API call
+      const contextTokens = perTurnInputTokens + cacheReadTokens
+
+      // Get context window from modelUsage if available
+      let maxContextWindow = 0
+      if (msg.modelUsage) {
+        for (const usage of Object.values(msg.modelUsage)) {
+          if (usage.contextWindow) {
+            maxContextWindow = Math.max(maxContextWindow, usage.contextWindow)
+          }
+        }
+      }
+
       const metadata: MessageMetadata = {
         sessionId: msg.session_id,
-        inputTokens,
-        outputTokens,
-        totalTokens: inputTokens && outputTokens ? inputTokens + outputTokens : undefined,
+        // Store the actual context size (input + cache read) for context indicator
+        inputTokens: contextTokens,
+        outputTokens: perTurnOutputTokens,
+        cacheReadInputTokens: cacheReadTokens,
+        cacheCreationInputTokens: cacheCreationTokens,
+        contextWindow: maxContextWindow || undefined,
+        totalTokens: contextTokens + perTurnOutputTokens,
         totalCostUsd: msg.total_cost_usd,
         durationMs: startTime ? Date.now() - startTime : undefined,
         resultSubtype: msg.subtype || "success",

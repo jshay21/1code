@@ -9,18 +9,12 @@ import {
 import { cn } from "../../../lib/utils"
 import type { AgentMessageMetadata } from "./agent-message-usage"
 
-// Claude model context windows
-const CONTEXT_WINDOWS = {
-  opus: 200_000,
-  sonnet: 200_000,
-  haiku: 200_000,
-} as const
-
-type ModelId = keyof typeof CONTEXT_WINDOWS
+// Default Claude model context windows (can be overridden by SDK)
+const DEFAULT_CONTEXT_WINDOW = 200_000
 
 interface AgentContextIndicatorProps {
   messages: Array<{ metadata?: AgentMessageMetadata }>
-  modelId?: ModelId
+  contextWindow?: number
   className?: string
   onCompact?: () => void
   isCompacting?: boolean
@@ -88,18 +82,22 @@ function CircularProgress({
 
 export const AgentContextIndicator = memo(function AgentContextIndicator({
   messages,
-  modelId = "sonnet",
+  contextWindow: contextWindowProp,
   className,
   onCompact,
   isCompacting,
   disabled,
 }: AgentContextIndicatorProps) {
-  // Calculate session totals from all message metadata
-  const sessionTotals = useMemo(() => {
+  // Calculate context usage from most recent API call
+  // For new messages: Use modelUsage data which includes full context with caching
+  // For old messages: Estimate context from accumulated conversation tokens
+  const contextUsage = useMemo(() => {
+    let currentContextTokens = 0
     let totalInputTokens = 0
     let totalOutputTokens = 0
     let totalCostUsd = 0
 
+    // Sum all tokens for cost/usage tracking
     for (const msg of messages) {
       if (msg.metadata) {
         totalInputTokens += msg.metadata.inputTokens || 0
@@ -108,23 +106,58 @@ export const AgentContextIndicator = memo(function AgentContextIndicator({
       }
     }
 
-    const totalTokens = totalInputTokens + totalOutputTokens
+    // Find the most recent message with metadata (represents current conversation state)
+    let foundMessageIndex = -1
+    let foundMeta: any = null
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const meta = messages[i].metadata
+      if (meta?.inputTokens) {
+        foundMessageIndex = i
+        foundMeta = meta
+        break
+      }
+    }
+
+    let metadataContextWindow: number | undefined
+
+    if (foundMeta) {
+      // The inputTokens from modelUsage represents the actual context sent to the API
+      // Cache tokens are for billing tracking, not context size
+      currentContextTokens = foundMeta.inputTokens || 0
+      metadataContextWindow = foundMeta.contextWindow
+    }
+
+    // Debug logging for context tracking
+    console.log('[CONTEXT_INDICATOR] Context calculation:', {
+      messagesCount: messages.length,
+      foundMessageIndex,
+      foundMetadata: foundMeta ? {
+        input: foundMeta.inputTokens,
+        cacheRead: foundMeta.cacheReadInputTokens,
+        cacheCreation: foundMeta.cacheCreationInputTokens,
+        contextWindow: foundMeta.contextWindow,
+      } : 'not found',
+      currentContextTokens,
+      metadataContextWindow,
+    })
 
     return {
-      inputTokens: totalInputTokens,
-      outputTokens: totalOutputTokens,
-      totalTokens,
+      currentContextTokens,
+      metadataContextWindow,
+      totalInputTokens,
+      totalOutputTokens,
       totalCostUsd,
     }
   }, [messages])
 
-  const contextWindow = CONTEXT_WINDOWS[modelId]
+  // Use context window from: prop > metadata > default
+  const contextWindow = contextWindowProp || contextUsage.metadataContextWindow || DEFAULT_CONTEXT_WINDOW
   const percentUsed = Math.min(
     100,
-    (sessionTotals.totalTokens / contextWindow) * 100,
+    (contextUsage.currentContextTokens / contextWindow) * 100,
   )
 
-  const isEmpty = sessionTotals.totalTokens === 0
+  const isEmpty = contextUsage.currentContextTokens === 0
 
   const isClickable = onCompact && !disabled && !isCompacting
 
@@ -163,7 +196,7 @@ export const AgentContextIndicator = memo(function AgentContextIndicator({
               </span>
               <span className="text-muted-foreground mx-1">·</span>
               <span className="text-muted-foreground">
-                {formatTokens(sessionTotals.totalTokens)} /{" "}
+                {formatTokens(contextUsage.currentContextTokens)} /{" "}
                 {formatTokens(contextWindow)} context
               </span>
             </>

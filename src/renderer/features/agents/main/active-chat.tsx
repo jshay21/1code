@@ -184,7 +184,7 @@ import {
   clearSubChatDraft,
   getSubChatDraft,
 } from "../lib/drafts"
-const clearSubChatSelectionAtom = atom(null, () => {})
+const clearSubChatSelectionAtom = atom(null, () => { })
 const isSubChatMultiSelectModeAtom = atom(false)
 const selectedSubChatIdsAtom = atom(new Set<string>())
 // import { selectedTeamIdAtom } from "@/lib/atoms/team"
@@ -2444,77 +2444,77 @@ function ChatViewInner({
 
               return (
                 <MessageGroup key={msg.id}>
-                      {/* Attachments - NOT sticky, scroll normally */}
-                      {imageParts.length > 0 && (
-                        <motion.div
-                          className="mb-2 pointer-events-auto"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={{ duration: 0.1, ease: "easeOut" }}
-                        >
-                          <AgentUserMessageBubble
-                            messageId={msg.id}
-                            textContent=""
-                            imageParts={imageParts}
-                          />
-                        </motion.div>
-                      )}
-                      {/* User message text - sticky WITHIN this group */}
-                      {/* z-10 ensures user message stays above scrolling content (tool calls, buttons) */}
-                      <div
-                        data-user-message-id={msg.id}
-                        className={cn(
-                          "[&>div]:!mb-4 pointer-events-auto",
-                          "sticky z-10",
-                          isMobile
-                            ? CHAT_LAYOUT.stickyTopMobile
-                            : isSubChatsSidebarOpen
-                              ? CHAT_LAYOUT.stickyTopSidebarOpen
-                              : CHAT_LAYOUT.stickyTopSidebarClosed,
-                        )}
-                      >
-                        <AgentUserMessageBubble
-                          messageId={msg.id}
-                          textContent={textContent || ""}
-                          imageParts={[]}
+                  {/* Attachments - NOT sticky, scroll normally */}
+                  {imageParts.length > 0 && (
+                    <motion.div
+                      className="mb-2 pointer-events-auto"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.1, ease: "easeOut" }}
+                    >
+                      <AgentUserMessageBubble
+                        messageId={msg.id}
+                        textContent=""
+                        imageParts={imageParts}
+                      />
+                    </motion.div>
+                  )}
+                  {/* User message text - sticky WITHIN this group */}
+                  {/* z-10 ensures user message stays above scrolling content (tool calls, buttons) */}
+                  <div
+                    data-user-message-id={msg.id}
+                    className={cn(
+                      "[&>div]:!mb-4 pointer-events-auto",
+                      "sticky z-10",
+                      isMobile
+                        ? CHAT_LAYOUT.stickyTopMobile
+                        : isSubChatsSidebarOpen
+                          ? CHAT_LAYOUT.stickyTopSidebarOpen
+                          : CHAT_LAYOUT.stickyTopSidebarClosed,
+                    )}
+                  >
+                    <AgentUserMessageBubble
+                      messageId={msg.id}
+                      textContent={textContent || ""}
+                      imageParts={[]}
+                    />
+                    {/* Cloning indicator - shown while sandbox is being set up */}
+                    {shouldShowCloning && (
+                      <div className="mt-4">
+                        <AgentToolCall
+                          icon={AgentToolRegistry["tool-cloning"].icon}
+                          title={AgentToolRegistry["tool-cloning"].title({})}
+                          isPending={true}
+                          isError={false}
                         />
-                        {/* Cloning indicator - shown while sandbox is being set up */}
-                        {shouldShowCloning && (
-                          <div className="mt-4">
-                            <AgentToolCall
-                              icon={AgentToolRegistry["tool-cloning"].icon}
-                              title={AgentToolRegistry["tool-cloning"].title({})}
-                              isPending={true}
-                              isError={false}
-                            />
-                          </div>
-                        )}
-                        {/* Setup error with retry */}
-                        {shouldShowSetupError && (
-                          <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-                            <div className="flex items-center gap-2 text-destructive text-sm">
-                              <span>
-                                Failed to set up sandbox
-                                {sandboxSetupError ? `: ${sandboxSetupError}` : ""}
-                              </span>
-                              {onRetrySetup && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={onRetrySetup}
-                                >
-                                  Retry
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        )}
                       </div>
+                    )}
+                    {/* Setup error with retry */}
+                    {shouldShowSetupError && (
+                      <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                        <div className="flex items-center gap-2 text-destructive text-sm">
+                          <span>
+                            Failed to set up sandbox
+                            {sandboxSetupError ? `: ${sandboxSetupError}` : ""}
+                          </span>
+                          {onRetrySetup && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={onRetrySetup}
+                            >
+                              Retry
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
-                      {/* Assistant messages in this group */}
-                      {group.assistantMsgs.map((assistantMsg) => {
-                        const isLastMessage =
-                          assistantMsg.id === messages[messages.length - 1]?.id
+                  {/* Assistant messages in this group */}
+                  {group.assistantMsgs.map((assistantMsg) => {
+                    const isLastMessage =
+                      assistantMsg.id === messages[messages.length - 1]?.id
 
                     // Assistant message - flat layout, no bubble (like Canvas)
                     const contentParts =
@@ -2721,8 +2721,8 @@ function ChatViewInner({
                               "text-foreground px-2",
                               // Only show Summary styling if there are steps to collapse
                               isFinalText &&
-                                visibleStepsCount > 0 &&
-                                "pt-3 border-t border-border/50",
+                              visibleStepsCount > 0 &&
+                              "pt-3 border-t border-border/50",
                             )}
                           >
                             {/* Only show Summary label if there are steps to collapse */}
@@ -3055,16 +3055,16 @@ function ChatViewInner({
                   {isStreaming &&
                     isLastUserMessage &&
                     group.assistantMsgs.length === 0 &&
-                        sandboxSetupStatus === "ready" && (
-                          <div className="mt-4">
-                            <AgentToolCall
-                              icon={AgentToolRegistry["tool-planning"].icon}
-                              title={AgentToolRegistry["tool-planning"].title({})}
-                              isPending={true}
-                              isError={false}
-                            />
-                          </div>
-                        )}
+                    sandboxSetupStatus === "ready" && (
+                      <div className="mt-4">
+                        <AgentToolCall
+                          icon={AgentToolRegistry["tool-planning"].icon}
+                          title={AgentToolRegistry["tool-planning"].title({})}
+                          isPending={true}
+                          isError={false}
+                        />
+                      </div>
+                    )}
                 </MessageGroup>
               )
             })}
@@ -3120,8 +3120,8 @@ function ChatViewInner({
         className={cn(
           "px-2 pb-2 shadow-sm shadow-background relative z-10",
           (isStreaming || changedFilesForSubChat.length > 0) &&
-            !(pendingQuestions?.subChatId === subChatId) &&
-            "-mt-3 pt-3",
+          !(pendingQuestions?.subChatId === subChatId) &&
+          "-mt-3 pt-3",
         )}
       >
         <div className="w-full max-w-2xl mx-auto">
@@ -3493,10 +3493,10 @@ function ChatViewInner({
                     <div className="ml-1">
                       {/* Show "Implement plan" button when plan is ready and input is empty */}
                       {hasUnapprovedPlan &&
-                      !hasContent &&
-                      images.length === 0 &&
-                      files.length === 0 &&
-                      !isStreaming ? (
+                        !hasContent &&
+                        images.length === 0 &&
+                        files.length === 0 &&
+                        !isStreaming ? (
                         <Button
                           onClick={handleApprovePlan}
                           size="sm"
@@ -3731,6 +3731,29 @@ export function ChatView({
       return prev
     })
   }, [chatId, setUnseenChanges])
+
+  // Reset local state when chatId changes (since we removed key prop)
+  useEffect(() => {
+    // Reset diff state
+    setDiffStats({
+      fileCount: 0,
+      additions: 0,
+      deletions: 0,
+      isLoading: true,
+      hasChanges: false,
+    })
+    setDiffContent(null)
+    setParsedFileDiffs(null)
+    setPrefetchedFileContents({})
+
+    // Reset UI states owned by ChatView
+    // Note: ChatViewInner states (dropdowns etc) are reset because ChatViewInner has key={activeSubChatId}
+    setIsCreatingPr(false)
+    setIsReviewing(false)
+    setIsCommittingToPr(false)
+
+    // Note: Diff stats fetching is handled by the existing useEffect on [worktreePath, sandboxId, chatId]
+  }, [chatId])
 
   // Clear sub-chat "unseen changes" indicator when sub-chat becomes active
   useEffect(() => {
@@ -4275,12 +4298,12 @@ export function ChatView({
       const projectPath = (agentChat as any)?.project?.path as string | undefined
       const transport = worktreePath
         ? new IPCChatTransport({
-            chatId,
-            subChatId,
-            cwd: worktreePath,
-            projectPath,
-            mode: subChatMode,
-          })
+          chatId,
+          subChatId,
+          cwd: worktreePath,
+          projectPath,
+          mode: subChatMode,
+        })
         : null // Web transport not supported in desktop app
 
       if (!transport) {
@@ -4339,7 +4362,7 @@ export function ChatView({
                 try {
                   const audio = new Audio("./sound.mp3")
                   audio.volume = 1.0
-                  audio.play().catch(() => {})
+                  audio.play().catch(() => { })
                 } catch {
                   // Ignore audio errors
                 }
@@ -4472,7 +4495,7 @@ export function ChatView({
                 try {
                   const audio = new Audio("./sound.mp3")
                   audio.volume = 1.0
-                  audio.play().catch(() => {})
+                  audio.play().catch(() => { })
                 } catch {
                   // Ignore audio errors
                 }
@@ -5138,7 +5161,7 @@ export function ChatView({
                           <div className="ml-1">
                             <AgentSendButton
                               disabled={true}
-                              onClick={() => {}}
+                              onClick={() => { }}
                             />
                           </div>
                         </div>

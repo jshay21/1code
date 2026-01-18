@@ -5,10 +5,10 @@ import { useAtom, useAtomValue, useSetAtom } from "jotai"
 // import { useSearchParams, useRouter } from "next/navigation" // Desktop doesn't use next/navigation
 // Desktop: mock Next.js navigation hooks
 const useSearchParams = () => ({ get: () => null })
-const useRouter = () => ({ push: () => {}, replace: () => {} })
+const useRouter = () => ({ push: () => { }, replace: () => { } })
 // Desktop: mock Clerk hooks
 const useUser = () => ({ user: null })
-const useClerk = () => ({ signOut: () => {} })
+const useClerk = () => ({ signOut: () => { } })
 import {
   selectedAgentChatIdAtom,
   previousAgentChatIdAtom,
@@ -257,9 +257,9 @@ export function AgentsContent() {
   // IMPORTANT: Only recalculate when dialog is closed to prevent flickering
   const sortedChats = agentChats
     ? [...agentChats].sort(
-        (a, b) =>
-          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
-      )
+      (a, b) =>
+        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+    )
     : []
 
   let recentChats: typeof sortedChats = []
@@ -666,7 +666,7 @@ export function AgentsContent() {
         if (subChatQuickSwitchOpenRef.current) {
           const selectedSubChat =
             frozenSubChatsRef.current?.[
-              subChatQuickSwitchSelectedIndexRef.current
+            subChatQuickSwitchSelectedIndexRef.current
             ]
 
           if (selectedSubChat) {
@@ -743,10 +743,10 @@ export function AgentsContent() {
   // Check if chat has sandbox with port for preview
   const chatMeta = chatData?.meta as
     | {
-        sandboxConfig?: { port?: number }
-        isQuickSetup?: boolean
-        repository?: string
-      }
+      sandboxConfig?: { port?: number }
+      isQuickSetup?: boolean
+      repository?: string
+    }
     | undefined
   const isQuickSetup = chatMeta?.isQuickSetup === true
   const canShowPreview = !!(
@@ -776,7 +776,7 @@ export function AgentsContent() {
             userId={userId}
             clerkUser={user}
             onSignOut={handleSignOut}
-            onToggleSidebar={() => {}}
+            onToggleSidebar={() => { }}
             isMobileFullscreen={true}
             onChatSelect={() => setMobileViewMode("chat")}
           />
@@ -822,7 +822,7 @@ export function AgentsContent() {
                 key={selectedChatId}
                 chatId={selectedChatId}
                 isSidebarOpen={false}
-                onToggleSidebar={() => {}}
+                onToggleSidebar={() => { }}
                 selectedTeamName={selectedTeam?.name}
                 selectedTeamImageUrl={selectedTeam?.image_url}
                 isMobileFullscreen={true}
@@ -841,9 +841,9 @@ export function AgentsContent() {
                 onOpenTerminal={
                   canShowTerminal
                     ? () => {
-                        setTerminalSidebarOpen(true)
-                        setMobileViewMode("terminal")
-                      }
+                      setTerminalSidebarOpen(true)
+                      setMobileViewMode("terminal")
+                    }
                     : undefined
                 }
               />

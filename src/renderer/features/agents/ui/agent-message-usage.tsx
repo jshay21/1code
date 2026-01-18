@@ -14,6 +14,9 @@ export interface AgentMessageMetadata {
   inputTokens?: number
   outputTokens?: number
   totalTokens?: number
+  cacheReadInputTokens?: number
+  cacheCreationInputTokens?: number
+  contextWindow?: number
   finalTextId?: string
   durationMs?: number
   resultSubtype?: string

@@ -43,6 +43,7 @@ export type UIMessageChunk =
       type: "system-Compact"
       toolCallId: string
       state: "input-streaming" | "output-available"
+      preTokens?: number // Context tokens before compacting (only on output-available)
     }
   // Session initialization (MCP servers, plugins, tools)
   | {
@@ -70,6 +71,9 @@ export type MessageMetadata = {
   inputTokens?: number
   outputTokens?: number
   totalTokens?: number
+  cacheReadInputTokens?: number
+  cacheCreationInputTokens?: number
+  contextWindow?: number
   totalCostUsd?: number
   durationMs?: number
   resultSubtype?: string
