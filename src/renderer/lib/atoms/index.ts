@@ -59,6 +59,10 @@ export {
   // AskUserQuestion
   pendingUserQuestionsAtom,
 
+  // Git panel
+  gitPanelOpenAtom,
+  gitPanelHeightAtom,
+
   // Types
   type SavedRepo,
   type SelectedProject,
