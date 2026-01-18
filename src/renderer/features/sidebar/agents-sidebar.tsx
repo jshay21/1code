@@ -1594,8 +1594,8 @@ export function AgentsSidebar({
         </div>
       </div>
 
-      {/* Scrollable Agents List */}
-      <div className="flex-1 min-h-0 relative">
+      {/* Scrollable Agents List - hidden when git panel is open */}
+      <div className={cn("flex-1 min-h-0 relative", gitPanelOpen && "hidden")}>
         <div
           ref={scrollContainerRef}
           onScroll={handleAgentsScroll}
@@ -2315,6 +2315,16 @@ export function AgentsSidebar({
           )}
         />
       </div>
+
+      {/* Git Source Control Panel - shown when git panel is open */}
+      {gitPanelOpen && (
+        <div className="flex-1 min-h-0">
+          <GitPanel
+            worktreePath={selectedProject?.path || null}
+            defaultBranch="main"
+          />
+        </div>
+      )}
 
       {/* Footer - Multi-select toolbar or normal footer */}
       <AnimatePresence mode="wait">

@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useMemo, useCallback } from "react"
-import { useAtomValue, useSetAtom } from "jotai"
 import { trpc } from "../../lib/trpc"
 import {
   GitBranch,
@@ -9,19 +8,15 @@ import {
   Minus,
   RefreshCw,
   Check,
-  X,
   ChevronDown,
   ChevronRight,
   Undo2,
-  FileText,
   Upload,
   Download,
-  MoreHorizontal,
 } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { Button } from "../../components/ui/button"
 import { Textarea } from "../../components/ui/textarea"
-import { ScrollArea } from "../../components/ui/scroll-area"
 import {
   Collapsible,
   CollapsibleContent,
@@ -410,7 +405,7 @@ export function GitPanel({
       </div>
 
       {/* File lists */}
-      <ScrollArea className="flex-1">
+      <div className="flex-1 overflow-y-auto">
         <div className="py-1">
           {/* Staged Changes */}
           <Collapsible open={stagedOpen} onOpenChange={setStagedOpen}>
@@ -527,7 +522,7 @@ export function GitPanel({
             </CollapsibleContent>
           </Collapsible>
         </div>
-      </ScrollArea>
+      </div>
 
       {/* Footer with sync status */}
       {status?.hasUpstream && (status.pushCount > 0 || status.pullCount > 0) && (
