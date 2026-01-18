@@ -12,6 +12,7 @@ import {
   type NotificationMode,
 } from "../../../lib/atoms"
 import { Switch } from "../../ui/switch"
+import { Button } from "../../ui/button"
 import {
   Select,
   SelectContent,
@@ -174,6 +175,30 @@ export function AgentsPreferencesTab() {
                 </span>
               </div>
               <Switch checked={activityFeedEnabled} onCheckedChange={setActivityFeedEnabled} />
+            </div>
+
+            {/* Test Notification Button */}
+            <div className="flex items-start justify-between">
+              <div className="flex flex-col space-y-1">
+                <span className="text-sm font-medium text-foreground">
+                  Test Notification
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  Send a test notification to verify it's working
+                </span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  window.desktopApi?.showNotification({
+                    title: "21st Agents",
+                    body: "Notifications are working!",
+                  })
+                }}
+              >
+                Test
+              </Button>
             </div>
           </div>
         </div>
