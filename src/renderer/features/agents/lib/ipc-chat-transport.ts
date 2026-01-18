@@ -241,13 +241,14 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
                 )
               }
 
-              if (
-                chunk.type === "tool-output-available" ||
-                chunk.type === "tool-output-error"
-              ) {
+              if (chunk.type === "tool-output-available") {
+                dispatchToolComplete(chunk.toolCallId, false, chunk.output)
+              } else if (chunk.type === "tool-output-error") {
                 dispatchToolComplete(
                   chunk.toolCallId,
-                  chunk.type === "tool-output-error",
+                  true,
+                  undefined,
+                  chunk.errorText,
                 )
               }
 

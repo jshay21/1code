@@ -10,6 +10,7 @@ import {
   updateToolActivityAtom,
   type ToolActivity,
 } from "../../../lib/atoms"
+import { trpcClient } from "../../../lib/trpc"
 
 // Tool icons for toast notifications
 const TOOL_ICONS: Record<string, string> = {
@@ -30,7 +31,10 @@ const TOOL_ICONS: Record<string, string> = {
 /**
  * Extract a human-readable summary from tool input
  */
-function getToolSummary(toolName: string, input: Record<string, unknown>): string {
+function getToolSummary(
+  toolName: string,
+  input: Record<string, unknown>,
+): string {
   switch (toolName) {
     case "Read":
     case "Write":
@@ -77,7 +81,8 @@ function getToolIcon(toolName: string): string {
 }
 
 // Track window focus state
-let isWindowFocused = typeof document !== "undefined" ? document.hasFocus() : true
+let isWindowFocused =
+  typeof document !== "undefined" ? document.hasFocus() : true
 
 // Setup focus tracking (runs once)
 if (typeof window !== "undefined") {
@@ -102,6 +107,8 @@ declare global {
     "tool-complete": CustomEvent<{
       toolCallId: string
       isError: boolean
+      output?: unknown
+      errorText?: string
     }>
   }
 }
@@ -110,6 +117,7 @@ declare global {
  * Hook for tool execution notifications
  * - Shows toast notifications when tools start (if enabled)
  * - Adds activities to the activity feed
+ * - Persists activities to database
  * - Respects notification mode settings
  */
 export function useToolNotifications(subChatId: string, chatName: string) {
@@ -118,8 +126,10 @@ export function useToolNotifications(subChatId: string, chatName: string) {
   const addActivity = useSetAtom(addToolActivityAtom)
   const updateActivity = useSetAtom(updateToolActivityAtom)
 
-  // Track tool call IDs to activity IDs mapping
+  // Track tool call IDs to activity IDs mapping (local temp ID -> DB ID)
   const toolCallToActivityId = useRef<Map<string, string>>(new Map())
+  // Track local temp IDs for DB updates
+  const localToDbId = useRef<Map<string, string>>(new Map())
 
   /**
    * Check if we should show notifications based on current mode
@@ -136,20 +146,42 @@ export function useToolNotifications(subChatId: string, chatName: string) {
   const notifyToolStart = useCallback(
     (toolCallId: string, toolName: string, input: Record<string, unknown>) => {
       const summary = getToolSummary(toolName, input)
+      const inputJson = JSON.stringify(input)
 
-      // Add to activity feed (always, regardless of notification mode)
-      const activityId = addActivity({
+      // Optimistic UI update - add to atom immediately
+      const newActivity = addActivity({
         subChatId,
         chatName,
         toolName,
         summary,
         state: "running",
+        input: inputJson,
       })
 
-      // Track mapping for later updates
-      if (activityId) {
-        toolCallToActivityId.current.set(toolCallId, activityId)
+      // Track mapping for later updates (toolCallId -> local activity ID)
+      if (newActivity) {
+        toolCallToActivityId.current.set(toolCallId, newActivity.id)
       }
+
+      // Persist to database in background (fire-and-forget)
+      trpcClient.activities.create
+        .mutate({
+          subChatId,
+          chatName,
+          toolName,
+          summary,
+          state: "running",
+          input,
+        })
+        .then((dbActivity) => {
+          // Map local ID to DB ID for later updates
+          if (newActivity && dbActivity) {
+            localToDbId.current.set(newActivity.id, dbActivity.id)
+          }
+        })
+        .catch((err) => {
+          console.error("[TOOL_NOTIF] Failed to persist activity:", err)
+        })
 
       // Show toast if enabled and should notify
       if (toastsEnabled && shouldNotify()) {
@@ -166,15 +198,43 @@ export function useToolNotifications(subChatId: string, chatName: string) {
    * Notify when a tool completes
    */
   const notifyToolComplete = useCallback(
-    (toolCallId: string, isError: boolean) => {
-      const activityId = toolCallToActivityId.current.get(toolCallId)
-      if (activityId) {
-        updateActivity({
-          id: activityId,
-          state: isError ? "error" : "complete",
-        })
-        toolCallToActivityId.current.delete(toolCallId)
+    (
+      toolCallId: string,
+      isError: boolean,
+      output?: unknown,
+      errorText?: string,
+    ) => {
+      const localActivityId = toolCallToActivityId.current.get(toolCallId)
+      if (!localActivityId) return
+
+      const state: ToolActivity["state"] = isError ? "error" : "complete"
+      const outputJson = output ? JSON.stringify(output) : null
+
+      // Optimistic UI update
+      updateActivity({
+        id: localActivityId,
+        state,
+        output: outputJson,
+        errorText: errorText ?? null,
+      })
+
+      // Get DB ID and persist update
+      const dbId = localToDbId.current.get(localActivityId)
+      if (dbId) {
+        trpcClient.activities.update
+          .mutate({
+            id: dbId,
+            state,
+            output,
+            errorText,
+          })
+          .catch((err) => {
+            console.error("[TOOL_NOTIF] Failed to update activity:", err)
+          })
+        localToDbId.current.delete(localActivityId)
       }
+
+      toolCallToActivityId.current.delete(toolCallId)
     },
     [updateActivity],
   )
@@ -189,7 +249,12 @@ export function useToolNotifications(subChatId: string, chatName: string) {
     }
 
     const handleToolComplete = (e: WindowEventMap["tool-complete"]) => {
-      notifyToolComplete(e.detail.toolCallId, e.detail.isError)
+      notifyToolComplete(
+        e.detail.toolCallId,
+        e.detail.isError,
+        e.detail.output,
+        e.detail.errorText,
+      )
     }
 
     window.addEventListener("tool-start", handleToolStart)
@@ -230,12 +295,17 @@ export function dispatchToolStart(
 /**
  * Dispatch a tool complete event (called from ipc-chat-transport)
  */
-export function dispatchToolComplete(toolCallId: string, isError: boolean) {
+export function dispatchToolComplete(
+  toolCallId: string,
+  isError: boolean,
+  output?: unknown,
+  errorText?: string,
+) {
   if (typeof window === "undefined") return
 
   window.dispatchEvent(
     new CustomEvent("tool-complete", {
-      detail: { toolCallId, isError },
+      detail: { toolCallId, isError, output, errorText },
     }),
   )
 }

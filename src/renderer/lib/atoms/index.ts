@@ -444,7 +444,7 @@ export const activityFeedEnabledAtom = atomWithStorage<boolean>(
   { getOnInit: true },
 )
 
-// Activity feed state (in-memory, not persisted)
+// Activity feed state (in-memory cache, persisted to DB)
 export interface ToolActivity {
   id: string
   subChatId: string
@@ -452,36 +452,79 @@ export interface ToolActivity {
   toolName: string
   summary: string // "package.json", "npm install", "*.tsx"
   state: "running" | "complete" | "error"
-  timestamp: number
+  input: string | null // JSON string
+  output: string | null // JSON string
+  errorText: string | null
+  isPinned: boolean
+  createdAt: Date // From DB (mode: "timestamp")
 }
 
 export const toolActivityAtom = atom<ToolActivity[]>([])
 export const MAX_ACTIVITY_ITEMS = 50
 
-// Helper to add activity
+// Selected activity for viewer modal
+export const selectedActivityIdAtom = atom<string | null>(null)
+
+// Helper to add activity (returns the new activity with generated ID)
 export const addToolActivityAtom = atom(
   null,
-  (get, set, activity: Omit<ToolActivity, "id" | "timestamp">) => {
+  (
+    get,
+    set,
+    activity: Omit<
+      ToolActivity,
+      "id" | "createdAt" | "output" | "errorText" | "isPinned"
+    >,
+  ) => {
     const prev = get(toolActivityAtom)
     const newActivity: ToolActivity = {
       ...activity,
       id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      timestamp: Date.now(),
+      output: null,
+      errorText: null,
+      isPinned: false,
+      createdAt: new Date(),
     }
     set(toolActivityAtom, [newActivity, ...prev].slice(0, MAX_ACTIVITY_ITEMS))
-    return newActivity.id
+    return newActivity
   },
 )
 
-// Helper to update activity state
+// Helper to update activity state with output/error
 export const updateToolActivityAtom = atom(
   null,
-  (get, set, { id, state }: { id: string; state: ToolActivity["state"] }) => {
+  (
+    get,
+    set,
+    update: {
+      id: string
+      state: ToolActivity["state"]
+      output?: string | null
+      errorText?: string | null
+    },
+  ) => {
     const prev = get(toolActivityAtom)
     set(
       toolActivityAtom,
-      prev.map((a) => (a.id === id ? { ...a, state } : a)),
+      prev.map((a) =>
+        a.id === update.id
+          ? {
+              ...a,
+              state: update.state,
+              output: update.output ?? a.output,
+              errorText: update.errorText ?? a.errorText,
+            }
+          : a,
+      ),
     )
+  },
+)
+
+// Helper to set activities (for loading from DB)
+export const setToolActivitiesAtom = atom(
+  null,
+  (_get, set, activities: ToolActivity[]) => {
+    set(toolActivityAtom, activities.slice(0, MAX_ACTIVITY_ITEMS))
   },
 )
 
@@ -489,3 +532,15 @@ export const updateToolActivityAtom = atom(
 export const clearToolActivityAtom = atom(null, (_get, set) => {
   set(toolActivityAtom, [])
 })
+
+// Helper to toggle pin status
+export const toggleActivityPinAtom = atom(
+  null,
+  (get, set, { id, isPinned }: { id: string; isPinned: boolean }) => {
+    const prev = get(toolActivityAtom)
+    set(
+      toolActivityAtom,
+      prev.map((a) => (a.id === id ? { ...a, isPinned } : a)),
+    )
+  },
+)
