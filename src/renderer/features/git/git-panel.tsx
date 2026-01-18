@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback } from "react"
 import { trpc } from "../../lib/trpc"
 import {
   GitBranch,
+  GitCommit,
   Plus,
   Minus,
   RefreshCw,
@@ -171,6 +172,7 @@ export function GitPanel({
   const [commitMessage, setCommitMessage] = useState("")
   const [stagedOpen, setStagedOpen] = useState(true)
   const [changesOpen, setChangesOpen] = useState(true)
+  const [outgoingOpen, setOutgoingOpen] = useState(true)
   const [isStaging, setIsStaging] = useState(false)
 
   const utils = trpc.useUtils()
@@ -586,26 +588,106 @@ export function GitPanel({
               )}
             </CollapsibleContent>
           </Collapsible>
+
+          {/* Outgoing commits (to push) */}
+          {status?.hasUpstream && (status.pushCount > 0 || status.pullCount > 0) && (
+            <Collapsible open={outgoingOpen} onOpenChange={setOutgoingOpen}>
+              <CollapsibleTrigger className="flex items-center justify-between w-full px-3 py-1 hover:bg-muted/50 text-sm">
+                <div className="flex items-center gap-1">
+                  {outgoingOpen ? (
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  ) : (
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  )}
+                  <span className="font-medium">Sync Status</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  {status.pullCount > 0 && (
+                    <span className="flex items-center gap-0.5">
+                      <Download className="h-3 w-3" />
+                      {status.pullCount}
+                    </span>
+                  )}
+                  {status.pushCount > 0 && (
+                    <span className="flex items-center gap-0.5">
+                      <Upload className="h-3 w-3" />
+                      {status.pushCount}
+                    </span>
+                  )}
+                </div>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                {status.pullCount > 0 && (
+                  <div className="px-2 py-1">
+                    <div className="flex items-center justify-between px-2 py-1 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Download className="h-3 w-3" />
+                        {status.pullCount} incoming {status.pullCount === 1 ? "commit" : "commits"}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-5 px-2 text-xs"
+                        onClick={() => worktreePath && pullMutation.mutate({ worktreePath })}
+                        disabled={pullMutation.isPending}
+                      >
+                        {pullMutation.isPending ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          "Pull"
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {status.pushCount > 0 && (
+                  <div className="px-2 py-1">
+                    <div className="flex items-center justify-between px-2 py-1 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Upload className="h-3 w-3" />
+                        {status.pushCount} outgoing {status.pushCount === 1 ? "commit" : "commits"}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-5 px-2 text-xs"
+                        onClick={() => worktreePath && pushMutation.mutate({ worktreePath, setUpstream: true })}
+                        disabled={pushMutation.isPending}
+                      >
+                        {pushMutation.isPending ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          "Push"
+                        )}
+                      </Button>
+                    </div>
+                    {/* Show outgoing commits */}
+                    {status.commits?.map((commit) => (
+                      <div
+                        key={commit.hash}
+                        className="flex items-start gap-2 px-2 py-1 text-xs hover:bg-muted/50 rounded-sm"
+                      >
+                        <GitCommit className="h-3 w-3 mt-0.5 text-muted-foreground flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="truncate text-foreground">{commit.message}</div>
+                          <div className="text-muted-foreground">
+                            {commit.shortHash} · {commit.author}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {status.pushCount === 0 && status.pullCount === 0 && (
+                  <div className="px-6 py-2 text-xs text-muted-foreground">
+                    Up to date with remote
+                  </div>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
+          )}
         </div>
       </div>
-
-      {/* Footer with sync status */}
-      {status?.hasUpstream && (status.pushCount > 0 || status.pullCount > 0) && (
-        <div className="px-3 py-2 border-t text-xs text-muted-foreground flex items-center gap-2">
-          {status.pullCount > 0 && (
-            <span className="flex items-center gap-1">
-              <Download className="h-3 w-3" />
-              {status.pullCount} to pull
-            </span>
-          )}
-          {status.pushCount > 0 && (
-            <span className="flex items-center gap-1">
-              <Upload className="h-3 w-3" />
-              {status.pushCount} to push
-            </span>
-          )}
-        </div>
-      )}
     </div>
   )
 }

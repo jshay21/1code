@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useAtomValue, useSetAtom } from "jotai"
 import {
   activityFeedEnabledAtom,
@@ -29,7 +29,33 @@ import {
   FileCode,
   Wrench,
   Pin,
+  FolderSearch,
+  ChevronRight,
 } from "lucide-react"
+
+// Exploration tools that can be grouped
+const EXPLORE_TOOLS = new Set(["Read", "Grep", "Glob"])
+
+// Minimum count to form a group
+const MIN_GROUP_SIZE = 3
+
+// Type for grouped activities in the feed
+type ActivityGroup = {
+  type: "group"
+  id: string // Use first activity's id
+  activities: ToolActivity[]
+  summary: string
+  chatName: string
+  createdAt: Date
+  hasError: boolean
+  hasRunning: boolean
+}
+
+type FeedItem = ToolActivity | ActivityGroup
+
+function isActivityGroup(item: FeedItem): item is ActivityGroup {
+  return "type" in item && item.type === "group"
+}
 
 // Tool icon components for display
 function getToolIcon(toolName: string) {
@@ -44,6 +70,7 @@ function getToolIcon(toolName: string) {
     case "Bash":
       return <Terminal className={iconClass} />
     case "Glob":
+      return <FolderSearch className={iconClass} />
     case "Grep":
       return <Search className={iconClass} />
     case "WebFetch":
@@ -78,6 +105,73 @@ function formatRelativeTime(date: Date): string {
   if (hours < 24) return `${hours}h ago`
 
   return `${Math.floor(hours / 24)}d ago`
+}
+
+/**
+ * Group consecutive exploration tools (Read, Grep, Glob)
+ */
+function groupActivities(sortedActivities: ToolActivity[]): FeedItem[] {
+  const result: FeedItem[] = []
+  let currentGroup: ToolActivity[] = []
+
+  const flushGroup = () => {
+    if (currentGroup.length >= MIN_GROUP_SIZE) {
+      // Create a group
+      const hasError = currentGroup.some((a) => a.state === "error")
+      const hasRunning = currentGroup.some((a) => a.state === "running")
+      result.push({
+        type: "group",
+        id: currentGroup[0].id,
+        activities: currentGroup,
+        summary: `Explored ${currentGroup.length} files`,
+        chatName: currentGroup[0].chatName,
+        createdAt: currentGroup[0].createdAt,
+        hasError,
+        hasRunning,
+      })
+    } else {
+      // Not enough to group, add individually
+      for (const activity of currentGroup) {
+        result.push(activity)
+      }
+    }
+    currentGroup = []
+  }
+
+  for (const activity of sortedActivities) {
+    // Pinned items never get grouped
+    if (activity.isPinned) {
+      flushGroup()
+      result.push(activity)
+      continue
+    }
+
+    if (EXPLORE_TOOLS.has(activity.toolName)) {
+      // Check if this belongs to the same session (within 5 minutes and same chat)
+      const lastInGroup = currentGroup[currentGroup.length - 1]
+      const timeDiff = lastInGroup
+        ? Math.abs(activity.createdAt.getTime() - lastInGroup.createdAt.getTime())
+        : 0
+      const sameChat = lastInGroup ? activity.chatName === lastInGroup.chatName : true
+
+      if (currentGroup.length === 0 || (timeDiff < 5 * 60 * 1000 && sameChat)) {
+        currentGroup.push(activity)
+      } else {
+        // Different session, flush and start new group
+        flushGroup()
+        currentGroup.push(activity)
+      }
+    } else {
+      // Non-explore tool, flush any current group and add this one
+      flushGroup()
+      result.push(activity)
+    }
+  }
+
+  // Flush remaining
+  flushGroup()
+
+  return result
 }
 
 /**
@@ -141,6 +235,54 @@ function ActivityItem({
 }
 
 /**
+ * Grouped activity item in the feed
+ */
+function GroupedActivityItem({
+  group,
+  onClick,
+}: {
+  group: ActivityGroup
+  onClick: () => void
+}) {
+  return (
+    <div
+      className="px-3 py-2 border-b border-border/50 hover:bg-muted/30 transition-colors group cursor-pointer"
+      onClick={onClick}
+    >
+      <div className="flex items-center gap-2">
+        <div className="text-muted-foreground">
+          <FolderSearch className="w-3.5 h-3.5" />
+        </div>
+        <span className="font-medium text-sm truncate flex-1">
+          Exploring
+        </span>
+        <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+          {group.activities.length}
+        </span>
+        {group.hasRunning && (
+          <LoadingDot isLoading={true} className="w-2.5 h-2.5 text-primary" />
+        )}
+        {group.hasError && !group.hasRunning && (
+          <span className="text-destructive text-xs font-medium">Error</span>
+        )}
+        {!group.hasError && !group.hasRunning && (
+          <span className="text-muted-foreground text-xs">✓</span>
+        )}
+        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+      </div>
+      <div className="text-xs text-muted-foreground truncate mt-0.5 pl-6">
+        {group.summary}
+      </div>
+      <div className="text-[10px] text-muted-foreground/70 mt-0.5 pl-6 flex items-center gap-1">
+        <span className="truncate max-w-[100px]">{group.chatName}</span>
+        <span>•</span>
+        <span>{formatRelativeTime(group.createdAt)}</span>
+      </div>
+    </div>
+  )
+}
+
+/**
  * Activity Feed Panel
  * Shows real-time tool execution history
  */
@@ -152,6 +294,9 @@ export function ActivityFeed({ className }: { className?: string }) {
   const setSelectedActivityId = useSetAtom(selectedActivityIdAtom)
   const selectedActivityId = useAtomValue(selectedActivityIdAtom)
   const togglePin = useSetAtom(toggleActivityPinAtom)
+
+  // State for grouped selection (when clicking a group)
+  const [selectedGroupActivities, setSelectedGroupActivities] = useState<ToolActivity[] | undefined>()
 
   // Get current chat's sub-chat IDs to filter activities
   const allSubChats = useAgentSubChatStore((s) => s.allSubChats)
@@ -240,6 +385,9 @@ export function ActivityFeed({ className }: { className?: string }) {
     return b.createdAt.getTime() - a.createdAt.getTime()
   })
 
+  // Group consecutive exploration tools
+  const feedItems = groupActivities(sortedActivities)
+
   // Count running activities
   const runningCount = activities.filter((a) => a.state === "running").length
 
@@ -275,15 +423,32 @@ export function ActivityFeed({ className }: { className?: string }) {
 
         {/* Activity list */}
         <div className="flex-1 overflow-y-auto">
-          {sortedActivities.length > 0 ? (
-            sortedActivities.map((activity) => (
-              <ActivityItem
-                key={activity.id}
-                activity={activity}
-                onClick={() => setSelectedActivityId(activity.id)}
-                onTogglePin={(e) => handleTogglePin(activity, e)}
-              />
-            ))
+          {feedItems.length > 0 ? (
+            feedItems.map((item) => {
+              if (isActivityGroup(item)) {
+                return (
+                  <GroupedActivityItem
+                    key={item.id}
+                    group={item}
+                    onClick={() => {
+                      setSelectedActivityId(item.activities[0].id)
+                      setSelectedGroupActivities(item.activities)
+                    }}
+                  />
+                )
+              }
+              return (
+                <ActivityItem
+                  key={item.id}
+                  activity={item}
+                  onClick={() => {
+                    setSelectedActivityId(item.id)
+                    setSelectedGroupActivities(undefined)
+                  }}
+                  onTogglePin={(e) => handleTogglePin(item, e)}
+                />
+              )
+            })
           ) : (
             <div className="p-4 text-muted-foreground text-sm text-center">
               No recent activity
@@ -295,9 +460,13 @@ export function ActivityFeed({ className }: { className?: string }) {
       {/* Viewer Modal */}
       <ActivityViewerModal
         activity={selectedActivity ?? null}
+        activities={selectedGroupActivities}
         open={!!selectedActivityId}
         onOpenChange={(open) => {
-          if (!open) setSelectedActivityId(null)
+          if (!open) {
+            setSelectedActivityId(null)
+            setSelectedGroupActivities(undefined)
+          }
         }}
       />
     </>
