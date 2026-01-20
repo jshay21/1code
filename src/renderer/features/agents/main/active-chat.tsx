@@ -164,6 +164,7 @@ import { AgentExitPlanModeTool } from "../ui/agent-exit-plan-mode-tool"
 import { AgentExploringGroup } from "../ui/agent-exploring-group"
 import { AgentFileItem } from "../ui/agent-file-item"
 import { AgentImageItem } from "../ui/agent-image-item"
+import { AgentTextContextItem } from "../ui/agent-text-context-item"
 import {
   AgentMessageUsage,
   type AgentMessageMetadata,
@@ -194,6 +195,26 @@ import {
   clearSubChatDraft,
   getSubChatDraft,
 } from "../lib/drafts"
+
+// Search feature
+import {
+  ChatSearchBar,
+  SearchHighlightProvider,
+  toggleSearchAtom,
+  chatSearchCurrentMatchAtom,
+} from "../search"
+
+// Text selection context
+import { TextSelectionProvider } from "../context/text-selection-context"
+import { TextSelectionPopover } from "../ui/text-selection-popover"
+import { useTextContextSelection } from "../hooks/use-text-context-selection"
+import type { SelectedTextContext } from "../lib/queue-utils"
+
+// Message queue
+import { useMessageQueueStore, EMPTY_QUEUE } from "../stores/message-queue-store"
+
+// Streaming status store (for queue processing)
+import { useStreamingStatusStore } from "../stores/streaming-status-store"
 const clearSubChatSelectionAtom = atom(null, () => { })
 const isSubChatMultiSelectModeAtom = atom(false)
 const selectedSubChatIdsAtom = atom(new Set<string>())
@@ -1032,6 +1053,8 @@ function ChatViewInner({
   dbSessionId,
   subChatModelId,
   onModelChange,
+  textContexts,
+  removeTextContext,
 }: {
   chat: Chat<any>
   subChatId: string
@@ -1054,6 +1077,8 @@ function ChatViewInner({
   dbSessionId?: string
   subChatModelId?: string | null
   onModelChange?: (modelId: "opus" | "sonnet" | "haiku") => void
+  textContexts: SelectedTextContext[]
+  removeTextContext: (id: string) => void
 }) {
   // UNCONTROLLED: just track if editor has content for send button
   const [hasContent, setHasContent] = useState(false)
@@ -1186,6 +1211,9 @@ function ChatViewInner({
   // Terminal sidebar control for "Open in Claude Code" button
   const setTerminalSidebarOpen = useSetAtom(terminalSidebarOpenAtom)
   const setOpenClaudeCode = useSetAtom(openClaudeCodeAtom)
+
+  // Chat search toggle (CMD+F)
+  const toggleSearch = useSetAtom(toggleSearchAtom)
 
   // Mutation for updating sub-chat mode in database
   const updateSubChatModeMutation = api.agents.updateSubChatMode.useMutation({
@@ -1330,6 +1358,36 @@ function ChatViewInner({
     window.addEventListener("keydown", handleKeyDown, true)
     return () => window.removeEventListener("keydown", handleKeyDown, true)
   }, [])
+
+  // Keyboard shortcut: Cmd+F to toggle chat search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "f") {
+        e.preventDefault()
+        e.stopPropagation()
+        toggleSearch()
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown, true)
+    return () => window.removeEventListener("keydown", handleKeyDown, true)
+  }, [toggleSearch])
+
+  // Scroll to current search match when it changes
+  const currentSearchMatch = useAtomValue(chatSearchCurrentMatchAtom)
+  useEffect(() => {
+    if (!currentSearchMatch) return
+    const container = chatContainerRef.current
+    if (!container) return
+
+    // Find the message element by data attribute (user or assistant)
+    const msgEl = container.querySelector(
+      `[data-user-message-id="${currentSearchMatch.messageId}"], [data-assistant-message-id="${currentSearchMatch.messageId}"]`
+    )
+    if (msgEl) {
+      msgEl.scrollIntoView({ behavior: "smooth", block: "center" })
+    }
+  }, [currentSearchMatch])
 
   // Plan approval state
   const [planApprovalPending, setPlanApprovalPending] = useState<
@@ -1494,6 +1552,12 @@ function ChatViewInner({
   }, [status, subChatId, messages.length])
 
   const isStreaming = status === "streaming" || status === "submitted"
+
+  // Sync streaming status to global store (for queue processing)
+  const setStreamingStatus = useStreamingStatusStore((s) => s.setStatus)
+  useEffect(() => {
+    setStreamingStatus(subChatId, status)
+  }, [subChatId, status, setStreamingStatus])
 
   const handleStopStream = useCallback(async () => {
     if (!isStreaming) return
@@ -2704,6 +2768,11 @@ function ChatViewInner({
 
   return (
     <>
+      {/* Chat Search Bar (CMD+F) */}
+      <ChatSearchBar
+        messages={messages}
+        topOffset={isSubChatsSidebarOpen ? "52px" : undefined}
+      />
       {/* Chat title - flex above scroll area (desktop only) */}
       {!isMobile && (
         <div
@@ -3184,7 +3253,7 @@ function ChatViewInner({
                 maxHeight={200}
                 onSubmit={handleSend}
                 contextItems={
-                  images.length > 0 || files.length > 0 ? (
+                  images.length > 0 || files.length > 0 || textContexts.length > 0 ? (
                     <div className="flex flex-wrap gap-[6px]">
                       {(() => {
                         // Build allImages array for gallery navigation
@@ -3218,6 +3287,14 @@ function ChatViewInner({
                           size={f.size}
                           isLoading={f.isLoading}
                           onRemove={() => removeFile(f.id)}
+                        />
+                      ))}
+                      {textContexts.map((ctx) => (
+                        <AgentTextContextItem
+                          key={ctx.id}
+                          text={ctx.text}
+                          preview={ctx.preview}
+                          onRemove={() => removeTextContext(ctx.id)}
                         />
                       ))}
                     </div>
@@ -3491,8 +3568,14 @@ export function ChatView({
   const setUndoStack = useSetAtom(undoStackAtom)
   const { notifyAgentComplete } = useDesktopNotifications()
 
+  // Text selection context hook
+  const { textContexts, addTextContext, removeTextContext, clearTextContexts } = useTextContextSelection()
+
   // Get active sub-chat ID for tracking purposes
   const activeSubChatId = useAgentSubChatStore((state) => state.activeSubChatId)
+
+  // Message queue for this sub-chat
+  const queue = useMessageQueueStore((s) => s.queues[activeSubChatId ?? ""] ?? EMPTY_QUEUE)
 
   // Check if any chat has unseen changes
   const hasAnyUnseenChanges = unseenChanges.size > 0
@@ -4859,15 +4942,19 @@ export function ChatView({
   // No early return - let the UI render with loading state handled by activeChat check below
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Main content */}
-      <div className="flex-1 overflow-hidden flex">
-        {/* Chat Panel */}
-        <div
-          className="flex-1 flex flex-col overflow-hidden relative"
-          style={{ minWidth: "350px" }}
-        >
-          {/* SubChatSelector header - absolute when sidebar open (desktop only), regular div otherwise */}
+    <TextSelectionProvider>
+      <SearchHighlightProvider>
+        <div className="flex h-full flex-col">
+          {/* Main content */}
+          <div className="flex-1 overflow-hidden flex">
+            {/* Chat Panel */}
+            <div
+              className="flex-1 flex flex-col overflow-hidden relative"
+              style={{ minWidth: "350px" }}
+            >
+              {/* Text Selection Popover for adding AI response text to context */}
+              <TextSelectionPopover onAddToContext={addTextContext} />
+              {/* SubChatSelector header - absolute when sidebar open (desktop only), regular div otherwise */}
           {!shouldHideChatHeader && (
             <div
               className={cn(
@@ -5034,6 +5121,8 @@ export function ChatView({
                 (agentSubChats.find(sc => sc.id === activeSubChatId)?.modelId as string | null | undefined)
               }
               onModelChange={handleModelChange}
+              textContexts={textContexts}
+              removeTextContext={removeTextContext}
             />
           ) : (
             <>
@@ -5513,7 +5602,9 @@ export function ChatView({
             workspaceId={chatId}
           />
         )}
-      </div>
-    </div>
+          </div>
+        </div>
+      </SearchHighlightProvider>
+    </TextSelectionProvider>
   )
 }

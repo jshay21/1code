@@ -28,6 +28,7 @@ import { UpdateBanner } from "../../components/update-banner"
 import { useUpdateChecker } from "../../lib/hooks/use-update-checker"
 import { useAgentSubChatStore } from "../../lib/stores/sub-chat-store"
 import { RightPanel, rightPanelOpenAtom } from "../right-panel"
+import { QueueProcessor } from "../agents/components/queue-processor"
 
 // ============================================================================
 // Constants
@@ -206,6 +207,8 @@ export function AgentsLayout() {
         onClose={() => setShortcutsOpen(false)}
       />
       <ClaudeLoginModal />
+      {/* Global message queue processor */}
+      <QueueProcessor />
       <div className="flex w-full h-full relative overflow-hidden bg-background select-none">
         {/* Left Sidebar (Agents) */}
         <ResizableSidebar
