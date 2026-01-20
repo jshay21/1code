@@ -108,10 +108,14 @@ export const AgentContextIndicator = memo(function AgentContextIndicator({
 
     // Find the most recent message with metadata (represents current conversation state)
     let foundMessageIndex = -1
-    let foundMeta: any = null
+    let foundMeta: AgentMessageMetadata | undefined
     for (let i = messages.length - 1; i >= 0; i--) {
       const meta = messages[i].metadata
-      if (meta?.inputTokens) {
+      if (
+        meta &&
+        (typeof meta.inputTokens === "number" ||
+          typeof meta.totalTokens === "number")
+      ) {
         foundMessageIndex = i
         foundMeta = meta
         break
@@ -123,23 +127,40 @@ export const AgentContextIndicator = memo(function AgentContextIndicator({
     if (foundMeta) {
       // The inputTokens from modelUsage represents the actual context sent to the API
       // Cache tokens are for billing tracking, not context size
-      currentContextTokens = foundMeta.inputTokens || 0
+      if (typeof foundMeta.inputTokens === "number") {
+        currentContextTokens = foundMeta.inputTokens
+      } else if (
+        typeof foundMeta.totalTokens === "number" &&
+        typeof foundMeta.outputTokens === "number"
+      ) {
+        currentContextTokens = Math.max(
+          0,
+          foundMeta.totalTokens - foundMeta.outputTokens,
+        )
+      } else if (typeof foundMeta.totalTokens === "number") {
+        // Fallback: not strictly "context", but better than showing 0.
+        currentContextTokens = Math.max(0, foundMeta.totalTokens)
+      }
       metadataContextWindow = foundMeta.contextWindow
     }
 
-    // Debug logging for context tracking
-    console.log('[CONTEXT_INDICATOR] Context calculation:', {
-      messagesCount: messages.length,
-      foundMessageIndex,
-      foundMetadata: foundMeta ? {
-        input: foundMeta.inputTokens,
-        cacheRead: foundMeta.cacheReadInputTokens,
-        cacheCreation: foundMeta.cacheCreationInputTokens,
-        contextWindow: foundMeta.contextWindow,
-      } : 'not found',
-      currentContextTokens,
-      metadataContextWindow,
-    })
+    if (import.meta.env.DEV) {
+      // Debug logging for context tracking (dev only)
+      console.log("[CONTEXT_INDICATOR] Context calculation:", {
+        messagesCount: messages.length,
+        foundMessageIndex,
+        foundMetadata: foundMeta
+          ? {
+              input: foundMeta.inputTokens,
+              cacheRead: foundMeta.cacheReadInputTokens,
+              cacheCreation: foundMeta.cacheCreationInputTokens,
+              contextWindow: foundMeta.contextWindow,
+            }
+          : "not found",
+        currentContextTokens,
+        metadataContextWindow,
+      })
+    }
 
     return {
       currentContextTokens,
@@ -151,10 +172,14 @@ export const AgentContextIndicator = memo(function AgentContextIndicator({
   }, [messages])
 
   // Use context window from: prop > metadata > default
-  const contextWindow = contextWindowProp || contextUsage.metadataContextWindow || DEFAULT_CONTEXT_WINDOW
+  const contextWindow =
+    contextWindowProp ||
+    contextUsage.metadataContextWindow ||
+    DEFAULT_CONTEXT_WINDOW
+  const safeContextWindow = contextWindow > 0 ? contextWindow : DEFAULT_CONTEXT_WINDOW
   const percentUsed = Math.min(
     100,
-    (contextUsage.currentContextTokens / contextWindow) * 100,
+    (contextUsage.currentContextTokens / safeContextWindow) * 100,
   )
 
   const isEmpty = contextUsage.currentContextTokens === 0
@@ -167,7 +192,7 @@ export const AgentContextIndicator = memo(function AgentContextIndicator({
         <div
           onClick={isClickable ? onCompact : undefined}
           className={cn(
-            "h-4 w-4 flex items-center justify-center",
+            "h-7 w-7 flex items-center justify-center",
             isClickable
               ? "cursor-pointer hover:opacity-70 transition-opacity"
               : "cursor-default",
@@ -187,7 +212,7 @@ export const AgentContextIndicator = memo(function AgentContextIndicator({
         <p className="text-xs">
           {isEmpty ? (
             <span className="text-muted-foreground">
-              Context: 0 / {formatTokens(contextWindow)}
+              Context: 0 / {formatTokens(safeContextWindow)}
             </span>
           ) : (
             <>
@@ -197,11 +222,16 @@ export const AgentContextIndicator = memo(function AgentContextIndicator({
               <span className="text-muted-foreground mx-1">·</span>
               <span className="text-muted-foreground">
                 {formatTokens(contextUsage.currentContextTokens)} /{" "}
-                {formatTokens(contextWindow)} context
+                {formatTokens(safeContextWindow)} context
               </span>
             </>
           )}
         </p>
+        {isClickable && (
+          <p className="text-xs text-muted-foreground mt-1">
+            Click to compact context
+          </p>
+        )}
       </TooltipContent>
     </Tooltip>
   )

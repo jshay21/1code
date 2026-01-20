@@ -51,6 +51,13 @@ export const BUILTIN_SLASH_COMMANDS: SlashCommandOption[] = [
     category: "builtin",
   },
   {
+    id: "builtin:ask",
+    name: "ask",
+    command: "/ask",
+    description: "Switch to Ask mode (answer questions without code changes)",
+    category: "builtin",
+  },
+  {
     id: "builtin:compact",
     name: "compact",
     command: "/compact",

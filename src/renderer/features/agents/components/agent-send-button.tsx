@@ -13,6 +13,8 @@ import {
   TooltipTrigger,
 } from "../../../components/ui/tooltip"
 
+type ChatMode = "agent" | "plan" | "ask"
+
 interface AgentSendButtonProps {
   /** Whether the system is currently streaming */
   isStreaming?: boolean
@@ -30,8 +32,8 @@ interface AgentSendButtonProps {
   size?: "sm" | "default" | "lg"
   /** Custom aria-label */
   ariaLabel?: string
-  /** Whether this is plan mode (orange styling) */
-  isPlanMode?: boolean
+  /** Current chat mode (agent/plan/ask) */
+  mode?: ChatMode
 }
 
 export function AgentSendButton({
@@ -43,7 +45,7 @@ export function AgentSendButton({
   className = "",
   size = "sm",
   ariaLabel,
-  isPlanMode = false,
+  mode = "agent",
 }: AgentSendButtonProps) {
   // Note: Enter shortcut is now handled by input components directly
 
@@ -109,8 +111,8 @@ export function AgentSendButton({
     ? "shadow-[0_0_0_2px_white,0_0_0_4px_rgba(0,0,0,0.06)] dark:shadow-[0_0_0_2px_#1a1a1a,0_0_0_4px_rgba(255,255,255,0.08)]"
     : undefined
 
-  // Mode-specific styling (agent=foreground, plan=orange)
-  const modeClass = isPlanMode
+  // Mode-specific styling (agent=foreground, plan=orange, ask=foreground)
+  const modeClass = mode === "plan"
     ? "!bg-plan-mode hover:!bg-plan-mode/90 !text-background !shadow-none"
     : "!bg-foreground hover:!bg-foreground/90 !text-background !shadow-none"
 

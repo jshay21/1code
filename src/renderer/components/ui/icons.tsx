@@ -4247,6 +4247,62 @@ export function PlanIconSmall({ className }: { className?: string }) {
   )
 }
 
+// Ask mode icon - message bubble with question mark (24x24)
+export function AskIcon(props: IconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      {...props}
+    >
+      <path
+        d="M7.9 20A9 9 0 1 0 4 16.1L2 22l5.9-2z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M12 8c-1.1 0-2 .9-2 2 0 .5.2 1 .6 1.4.4.4.9.6 1.4.6m0 3v.01"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+// Small 12x12 Ask mode icon for badges
+export function AskIconSmall({ className }: { className?: string }) {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 12 12"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+    >
+      <path
+        d="M3.95 10A4.5 4.5 0 1 0 2 8.05L1 11l2.95-1z"
+        stroke="currentColor"
+        strokeWidth="1.33"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M6 4c-.55 0-1 .45-1 1 0 .25.1.5.3.7.2.2.45.3.7.3m0 1.5v.01"
+        stroke="currentColor"
+        strokeWidth="1.33"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 // Small 12x12 version of the new Prototype icon (matches ExploreIcon in mode-toggle-button)
 export function PrototypeIconSmall({ className }: { className?: string }) {
   return (

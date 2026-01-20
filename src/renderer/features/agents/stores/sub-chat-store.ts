@@ -5,7 +5,7 @@ export interface SubChatMeta {
   name: string
   created_at?: string
   updated_at?: string
-  mode?: "plan" | "agent"
+  mode?: "plan" | "agent" | "ask"
   modelId?: "opus" | "sonnet" | "haiku"
 }
 
@@ -29,7 +29,7 @@ interface AgentSubChatStore {
   setAllSubChats: (subChats: SubChatMeta[]) => void
   addToAllSubChats: (subChat: SubChatMeta) => void
   updateSubChatName: (subChatId: string, name: string) => void
-  updateSubChatMode: (subChatId: string, mode: "plan" | "agent") => void
+  updateSubChatMode: (subChatId: string, mode: "plan" | "agent" | "ask") => void
   updateSubChatModel: (subChatId: string, modelId: "opus" | "sonnet" | "haiku") => void
   updateSubChatTimestamp: (subChatId: string) => void
   reorderOpenSubChats: (oldIndex: number, newIndex: number) => void

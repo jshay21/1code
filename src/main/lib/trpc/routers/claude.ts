@@ -135,7 +135,7 @@ export const claudeRouter = router({
         prompt: z.string(),
         cwd: z.string(),
         projectPath: z.string().optional(), // Original project path for MCP config lookup
-        mode: z.enum(["plan", "agent"]).default("agent"),
+        mode: z.enum(["plan", "agent", "ask"]).default("agent"),
         sessionId: z.string().optional(),
         model: z.string().optional(),
         maxThinkingTokens: z.number().optional(), // Enable extended thinking
@@ -482,8 +482,10 @@ export const claudeRouter = router({
                 permissionMode:
                   input.mode === "plan"
                     ? ("plan" as const)
-                    : ("bypassPermissions" as const),
-                ...(input.mode !== "plan" && {
+                    : input.mode === "ask"
+                      ? ("dontAsk" as const)
+                      : ("bypassPermissions" as const),
+                ...(input.mode === "agent" && {
                   allowDangerouslySkipPermissions: true,
                 }),
                 includePartialMessages: true,
@@ -494,6 +496,13 @@ export const claudeRouter = router({
                   toolInput: Record<string, unknown>,
                   options: { toolUseID: string },
                 ) => {
+                  // Ask mode: deny ALL tools (defense-in-depth alongside permissionMode: "dontAsk")
+                  if (input.mode === "ask") {
+                    return {
+                      behavior: "deny",
+                      message: "Tools are not available in Ask mode",
+                    }
+                  }
                   if (toolName === "AskUserQuestion") {
                     const { toolUseID } = options
                     // Emit to UI (safely in case observer is closed)

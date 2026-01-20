@@ -6,6 +6,7 @@ import {
   IconSpinner,
   PlanIcon,
   AgentIcon,
+  AskIcon,
 } from "../../../components/ui/canvas-icons"
 import { useAtomValue } from "jotai"
 import { agentsUnseenChangesAtom, lastChatModesAtom } from "../atoms"
@@ -28,6 +29,8 @@ interface AgentChatCardProps {
   repoName?: string | null
 }
 
+type ChatMode = "agent" | "plan" | "ask"
+
 // Chat icon with status badge
 function ChatIconWithBadge({
   isLoading,
@@ -39,7 +42,7 @@ function ChatIconWithBadge({
 }: {
   isLoading: boolean
   hasUnseenChanges: boolean
-  lastMode: "plan" | "agent"
+  lastMode: ChatMode
   isSelected?: boolean
   gitOwner?: string | null
   gitProvider?: string | null
@@ -82,6 +85,13 @@ function ChatIconWithBadge({
           <div className="w-2 h-2 rounded-full bg-[#307BD0]" />
         ) : lastMode === "plan" ? (
           <PlanIcon
+            className={cn(
+              "w-2.5 h-2.5",
+              isSelected ? "text-primary-foreground" : "text-muted-foreground",
+            )}
+          />
+        ) : lastMode === "ask" ? (
+          <AskIcon
             className={cn(
               "w-2.5 h-2.5",
               isSelected ? "text-primary-foreground" : "text-muted-foreground",

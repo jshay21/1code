@@ -16,6 +16,7 @@ import {
   IconChatBubble,
   PlanIcon,
   AgentIcon,
+  AskIcon,
 } from "../../../components/ui/icons"
 import {
   MessageSquareCode,
@@ -38,6 +39,8 @@ function getCommandIcon(commandName: string) {
       return PlanIcon
     case "agent":
       return AgentIcon
+    case "ask":
+      return AskIcon
     case "review":
       return Eye
     case "pr-comments":
@@ -51,6 +54,8 @@ function getCommandIcon(commandName: string) {
   }
 }
 
+type ChatMode = "agent" | "plan" | "ask"
+
 interface AgentsSlashCommandProps {
   isOpen: boolean
   onClose: () => void
@@ -59,7 +64,7 @@ interface AgentsSlashCommandProps {
   position: { top: number; left: number }
   teamId?: string
   repository?: string
-  isPlanMode?: boolean
+  chatMode?: ChatMode
   disabledCommands?: string[]
 }
 
@@ -72,7 +77,7 @@ export const AgentsSlashCommand = memo(function AgentsSlashCommand({
   position,
   teamId,
   repository,
-  isPlanMode,
+  chatMode,
   disabledCommands,
 }: AgentsSlashCommandProps) {
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -151,11 +156,12 @@ export const AgentsSlashCommand = memo(function AgentsSlashCommand({
   const options: SlashCommandOption[] = useMemo(() => {
     let builtinFiltered = filterBuiltinCommands(debouncedSearchText)
 
-    // Hide /plan when already in Plan mode, hide /agent when already in Agent mode
-    if (isPlanMode !== undefined) {
+    // Hide current mode's command (e.g., hide /plan when already in Plan mode)
+    if (chatMode !== undefined) {
       builtinFiltered = builtinFiltered.filter((cmd) => {
-        if (isPlanMode && cmd.name === "plan") return false
-        if (!isPlanMode && cmd.name === "agent") return false
+        if (chatMode === "plan" && cmd.name === "plan") return false
+        if (chatMode === "agent" && cmd.name === "agent") return false
+        if (chatMode === "ask" && cmd.name === "ask") return false
         return true
       })
     }
@@ -180,7 +186,7 @@ export const AgentsSlashCommand = memo(function AgentsSlashCommand({
 
     // Return builtin first, then repository commands
     return [...builtinFiltered, ...repoFiltered]
-  }, [debouncedSearchText, repoCommands, isPlanMode, disabledCommands])
+  }, [debouncedSearchText, repoCommands, chatMode, disabledCommands])
 
   // Track previous values for smarter selection reset
   const prevIsOpenRef = useRef(isOpen)

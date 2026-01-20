@@ -186,6 +186,27 @@ export const defaultModelIdAtom = atomWithStorage<string>(
   { getOnInit: true },
 )
 
+// Chat mode type
+export type ChatMode = "agent" | "plan" | "ask"
+
+// Migrate from old boolean atom if exists
+if (typeof window !== "undefined") {
+  const oldValue = localStorage.getItem("agents:isPlanMode")
+  if (oldValue !== null) {
+    const mode: ChatMode = oldValue === "true" ? "plan" : "agent"
+    localStorage.setItem("agents:chatMode", JSON.stringify(mode))
+    localStorage.removeItem("agents:isPlanMode")
+  }
+}
+
+export const chatModeAtom = atomWithStorage<ChatMode>(
+  "agents:chatMode",
+  "agent",
+  undefined,
+  { getOnInit: true },
+)
+
+// @deprecated Use chatModeAtom instead - kept for backward compatibility during migration
 export const isPlanModeAtom = atomWithStorage<boolean>(
   "agents:isPlanMode",
   false,
@@ -330,10 +351,10 @@ export const archiveSearchQueryAtom = atom<string>("")
 // Repository filter for archive (null = all repositories)
 export const archiveRepositoryFilterAtom = atom<string | null>(null)
 
-// Track last used mode (plan/agent) per chat
-// Map<chatId, "plan" | "agent">
-export const lastChatModesAtom = atom<Map<string, "plan" | "agent">>(
-  new Map<string, "plan" | "agent">(),
+// Track last used mode per chat
+// Map<chatId, ChatMode>
+export const lastChatModesAtom = atom<Map<string, ChatMode>>(
+  new Map<string, ChatMode>(),
 )
 
 // Mobile view mode - chat (default, shows NewChatForm), chats list, preview, diff, or terminal
