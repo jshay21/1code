@@ -14,6 +14,7 @@ import { appStore } from "../../../lib/jotai-store"
 import { trpcClient } from "../../../lib/trpc"
 import {
   askUserQuestionResultsAtom,
+  chatWaitingForUserAtom,
   compactingSubChatsAtom,
   lastSelectedModelIdAtom,
   MODEL_ID_MAP,
@@ -21,6 +22,7 @@ import {
   pendingUserQuestionsAtom,
 } from "../atoms"
 import { useAgentSubChatStore } from "../stores/sub-chat-store"
+import { soundManager } from "../../../lib/sound-manager"
 
 // Error categories and their user-friendly messages
 const ERROR_TOAST_CONFIG: Record<
@@ -128,6 +130,9 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
     messages: UIMessage[]
     abortSignal?: AbortSignal
   }): Promise<ReadableStream<UIMessageChunk>> {
+    // Clear waiting-for-user state when user sends a new message
+    appStore.set(chatWaitingForUserAtom, null)
+
     // Extract prompt and images from last user message
     const lastUser = [...options.messages]
       .reverse()
@@ -165,6 +170,8 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
     const subId = this.config.subChatId.slice(-8)
     let chunkCount = 0
     let lastChunkType = ""
+    // Track if thinking sound was played this message (play once per message)
+    let thinkingSoundPlayed = false
     console.log(`[SD] R:START sub=${subId} cwd=${this.config.cwd} projectPath=${this.config.projectPath || "(not set)"} customConfig=${customConfig ? "set" : "not set"}`)
 
     return new ReadableStream({
@@ -246,6 +253,39 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
                 })
               }
 
+              // === SOUND TRIGGERS ===
+
+              // Thinking sound - play once when reasoning starts
+              if (
+                (chunk.type === "reasoning" ||
+                  chunk.type === "reasoning-delta") &&
+                !thinkingSoundPlayed
+              ) {
+                soundManager.play("thinking")
+                thinkingSoundPlayed = true
+              }
+
+              // Tool execution sound - debounced, per-tool sounds
+              if (chunk.type === "tool-input-available") {
+                soundManager.playTool(chunk.toolName, 2000) // 2s debounce
+              }
+
+              // Bash result sounds
+              if (chunk.type === "tool-output-available") {
+                // Check if this was a Bash tool by looking at the output structure
+                const output = chunk.output as { exitCode?: number } | undefined
+                if (typeof output?.exitCode === "number") {
+                  soundManager.playResult(output.exitCode === 0)
+                }
+              }
+
+              // Stream complete sound + set waiting for user state
+              if (chunk.type === "finish") {
+                soundManager.play("stop")
+                // Mark this chat as waiting for user input (triggers nagging sound)
+                appStore.set(chatWaitingForUserAtom, this.config.subChatId)
+              }
+
               // Clear pending questions ONLY when agent has moved on
               // Don't clear on tool-input-* chunks (still building the question input)
               // Clear when we get tool-output-* (answer received) or text-delta (agent moved on)
@@ -266,6 +306,7 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
 
               // Handle authentication errors - show Claude login modal
               if (chunk.type === "auth-error") {
+                soundManager.play("error")
                 // Store the failed message for retry after successful auth
                 // readyToRetry=false prevents immediate retry - modal sets it to true on OAuth success
                 appStore.set(pendingAuthRetryMessageAtom, {
@@ -286,6 +327,7 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
 
               // Handle errors - show toast to user FIRST before anything else
               if (chunk.type === "error") {
+                soundManager.play("error")
                 // Track error in Sentry
                 const category = chunk.debugInfo?.category || "UNKNOWN"
                 Sentry.captureException(
