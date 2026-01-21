@@ -24,6 +24,7 @@ import {
   ShieldCheck,
   Eye,
   FolderGit2,
+  Gauge,
 } from "lucide-react"
 import type { SlashCommandOption, SlashTriggerPayload } from "./types"
 import {
@@ -50,6 +51,8 @@ function getCommandIcon(commandName: string) {
       return ShieldCheck
     case "worktree-setup":
       return FolderGit2
+    case "context":
+      return Gauge
     default:
       return IconChatBubble
   }
